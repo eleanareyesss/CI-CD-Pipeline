@@ -34,11 +34,6 @@ jobs:
         with: 
           path: frontend/build
 
-      # - id: build-publish
-      #   uses: bitovi/github-actions-react-to-github-pages@v1.2.2
-      #   with:
-      #     path: build # change to your build folder
-      
   audit:
     name: 🛡️ Audit Frontend Deps
     runs-on: ubuntu-latest
@@ -96,9 +91,9 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v2
+        uses: github/codeql-action/init@v3 
         with:
-          config-file: .github/codeql /codeql.config.yml
+          config-file: .github/codeql/codeql.config.yml 
           
       - name: Setup Node
         uses: actions/setup-node@v3
