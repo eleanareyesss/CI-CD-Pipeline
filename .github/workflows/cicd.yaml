@@ -3,10 +3,7 @@ name: CI/CD Pipeline
 on:
   push:
     branches:
-      - main
-  pull_request:
-    branches:
-      - main
+      - olt
 
 permissions:
   contents: read
@@ -19,11 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Run the audit on production deps only
-        run: |
-          cd frontend
-          npm install
-          npm audit --omit=dev
+        run: npm audit --omit=dev
 
   build:
     name: 🏗️ Build Frontend Artifact
@@ -31,20 +26,24 @@ jobs:
     needs: audit
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v3
         with:
           node-version: 16.x
           cache: 'npm'
+
       - name: Install Dependencies
         run: |
           cd frontend
-          npm install
+          npm i
+
       - name: Build artifact
         run: |
           cd frontend
           npm run build
+
       - uses: actions/upload-pages-artifact@v1
-        with: 
+        with:
           path: frontend/build
 
   lint:
@@ -53,19 +52,18 @@ jobs:
     needs: build
     steps:
       - uses: actions/checkout@v3
+
       - name: Setup Node 16
         uses: actions/setup-node@v3
         with:
           node-version: 16.x
           cache: 'npm'
+
       - name: Install deps
-        run: |
-          cd frontend
-          npm install
+        run: cd frontend && npm i
+
       - name: 📌 Lint code
-        run: |
-          cd frontend
-          npm run lint -- --rule 'react/react-in-jsx-scope: off'
+        run: cd frontend && npm run lint
 
   test:
     name: 📝 Run Unit Tests
@@ -73,19 +71,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+
       - name: Setup Node 16
         uses: actions/setup-node@v3
         with:
           node-version: 16.x
           cache: 'npm'
+
       - name: Install deps
-        run: |
-          cd frontend
-          npm install
+        run: cd frontend && npm i
+
       - name: Run the unit tests
-        run: |
-          cd frontend
-          npm run test-ci
+        run: cd frontend && npm run test-ci
 
   static-analysis:
     name: 👩🏻‍💻 Run Static Code Analysis
@@ -95,23 +92,23 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@v3
+
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3 
+        uses: github/codeql-action/init@v3
         with:
-          config-file: .github/codeql/codeql.config.yml 
+          config-file: .github/codeql/codeql.config.yml
+
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
           node-version: 16.x
           cache: 'npm'
+
       - name: Install Deps
-        run: |
-          cd frontend
-          npm install
+        run: cd frontend && npm i
+
       - name: Build
-        run: |
-          cd frontend
-          npm run build
+        run: cd frontend && npm run build
 
   deploy:
     name: 🛠️ Deploy Frontend Artifact
@@ -120,21 +117,23 @@ jobs:
       - lint
       - test
       - static-analysis
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/olt'
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
     permissions:
       pages: write
       id-token: write
     environment:
       name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v1
-        with:
-          artifact: 'frontend/build'
-      - name: Set Output URL
+
+      - name: Extract Deployment URL
         run: echo "page_url=${{ steps.deployment.outputs.page_url }}" >> $GITHUB_ENV
 
   verify:
@@ -142,13 +141,14 @@ jobs:
     needs: deploy
     runs-on: ubuntu-latest
     if: success()
-    permissions: write-all
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+
       - name: Run Frontend Smoke Test
+        env:
+          TEST_URL: ${{ env.page_url }}
         run: |
-          echo "TEST_URL=${{ env.page_url }}" >> $GITHUB_ENV
           cd frontend/e2e
-          npm install
+          npm i
           npm run smoke
