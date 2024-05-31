@@ -1,80 +1,97 @@
 name: CI/CD Pipeline
 
-# This workflow gets triggered on push or pull request events to the main branch
+# Este flujo de trabajo se activa en eventos de push o pull request en la rama principal
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
 
-# Permissions
+# Permisos necesarios
 permissions:
   contents: read
   pages: write
   id-token: write
 
-jobs: 
+jobs:
+  # Trabajo de auditoría de dependencias
   audit-job:
     name: 👩🏻‍💻 Audit Dependencies
     runs-on: ubuntu-latest
     steps:
+      # Chequear el código fuente
       - uses: actions/checkout@v4
+      # Auditar dependencias de producción
       - name: Audit production dependencies
         run: npm audit --omit=dev 
 
+  # Trabajo de construcción del artefacto
   build-job: 
     name: 🏗️ Build Artifact
     runs-on: ubuntu-latest
     needs: audit-job
     steps:
+      # Chequear el código fuente
       - uses: actions/checkout@v4
+      # Configurar Node.js
       - uses: actions/setup-node@v3
         with:
           node-version: 16.x
           cache: 'npm'
+      # Instalar dependencias y construir el proyecto
       - name: Install and build
         run: |
           cd frontend
           npm install
           npm run build
+      # Subir el artefacto generado
       - uses: actions/upload-pages-artifact@v1
         with: 
           path: frontend/build
 
+  # Trabajo de linting de código
   lint-job:
     name: 🖇️ Lint Code
     runs-on: ubuntu-latest
     needs: build-job
     steps:
+      # Chequear el código fuente
       - uses: actions/checkout@v3
+      # Configurar Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 16.x
           cache: 'npm'
+      # Instalar dependencias y ejecutar el linting
       - name: Install dependencies and lint
         run: |
           cd frontend
           npm install
           npm run lint
 
+  # Trabajo de ejecución de pruebas
   test-job:
     name: 🧪 Run Tests
     needs: build-job
     runs-on: ubuntu-latest
     steps:
+      # Chequear el código fuente
       - uses: actions/checkout@v3
+      # Configurar Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 16.x
           cache: 'npm'
+      # Instalar dependencias y ejecutar pruebas
       - name: Install dependencies and run tests
         run: |
           cd frontend
           npm install
           npm run test-ci
 
+  # Trabajo de análisis estático de código
   static-analysis-job:
     name: 📝 Static Code Analysis
     needs: build-job
@@ -82,22 +99,27 @@ jobs:
     permissions:
       security-events: write
     steps:
+      # Chequear el código fuente
       - uses: actions/checkout@v3
+      # Inicializar CodeQL
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           config-file: .github/codeql/codeql.config.yml
+      # Configurar Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 16.x
           cache: 'npm'
+      # Instalar dependencias y construir el proyecto
       - name: Install dependencies and build
         run: |
           cd frontend
           npm install
           npm run build
 
+  # Trabajo de despliegue del artefacto
   deploy-job:
     name: 🛠️ Deploy Artifact
     runs-on: ubuntu-latest
@@ -115,10 +137,12 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # Desplegar a GitHub Pages
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v1
 
+  # Trabajo de verificación del despliegue
   verify-job:
     name: ✔️ Verify Deployment
     needs:
@@ -127,8 +151,10 @@ jobs:
     if: success()
     permissions: write-all
     steps:
+      # Chequear el código fuente
       - name: Checkout
         uses: actions/checkout@v3
+      # Ejecutar pruebas de humo
       - name: Run smoke test
         run: |
           export TEST_URL=${{needs.deploy-job.outputs.page_url}}
